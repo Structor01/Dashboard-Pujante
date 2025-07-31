@@ -174,51 +174,36 @@ def create_escritorios_charts(escritorios_df):
     
     st.subheader("🏢 Escritórios Apoiadores")
     
-    col1, col2 = st.columns(2)
-    
-    # Lista de escritórios
-    with col1:
-        st.subheader("Lista de Escritórios")
-        if 'Nome do Escritório' in escritorios_df.columns:
-            for idx, row in escritorios_df.iterrows():
-                nome = row['Nome do Escritório']
-                cidade = row.get('Cidade', 'N/A')
-                st.markdown(f"**{nome}**")
-                st.markdown(f"📍 {cidade}")
-                st.markdown(f"💰 R$ 350,00/mês")
-                st.markdown("---")
-    
     # Distribuição por cidade
-    with col2:
-        st.subheader("Distribuição por Região")
-        if 'Cidade' in escritorios_df.columns:
-            # Simplificar cidades (pegar primeira cidade quando há múltiplas)
-            cidades_simplificadas = []
-            for cidade in escritorios_df['Cidade']:
-                if pd.notna(cidade):
-                    primeira_cidade = cidade.split(',')[0].strip()
-                    cidades_simplificadas.append(primeira_cidade)
-                else:
-                    cidades_simplificadas.append('N/A')
-            
-            escritorios_df['Cidade_Principal'] = cidades_simplificadas
-            cidades_count = escritorios_df['Cidade_Principal'].value_counts()
-            
-            fig_cidades = px.bar(
-                x=cidades_count.index,
-                y=cidades_count.values,
-                title="Escritórios por Cidade Principal",
-                color=cidades_count.values,
-                color_continuous_scale=['#bdc3c7', '#2c3e50']
-            )
-            fig_cidades.update_layout(
-                font=dict(size=12),
-                height=400,
-                xaxis_title="Cidade",
-                yaxis_title="Número de Escritórios",
-                showlegend=False
-            )
-            st.plotly_chart(fig_cidades, use_container_width=True)
+    st.subheader("📍 Distribuição por Região")
+    if 'Cidade' in escritorios_df.columns:
+        # Simplificar cidades (pegar primeira cidade quando há múltiplas)
+        cidades_simplificadas = []
+        for cidade in escritorios_df['Cidade']:
+            if pd.notna(cidade):
+                primeira_cidade = cidade.split(',')[0].strip()
+                cidades_simplificadas.append(primeira_cidade)
+            else:
+                cidades_simplificadas.append('N/A')
+        
+        escritorios_df['Cidade_Principal'] = cidades_simplificadas
+        cidades_count = escritorios_df['Cidade_Principal'].value_counts()
+        
+        fig_cidades = px.bar(
+            x=cidades_count.index,
+            y=cidades_count.values,
+            title="Escritórios por Cidade Principal",
+            color=cidades_count.values,
+            color_continuous_scale=['#bdc3c7', '#2c3e50']
+        )
+        fig_cidades.update_layout(
+            font=dict(size=12),
+            height=400,
+            xaxis_title="Cidade",
+            yaxis_title="Número de Escritórios",
+            showlegend=False
+        )
+        st.plotly_chart(fig_cidades, use_container_width=True)
 
 def create_financial_analysis():
     """Cria análise financeira detalhada"""
