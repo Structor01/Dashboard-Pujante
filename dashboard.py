@@ -50,8 +50,11 @@ st.markdown("""
 def load_data():
     """Carrega e processa os dados das planilhas"""
     try:
-        # Carregar dados de leads
+        # Carregar dados de leads originais
         leads_df = pd.read_excel('data/LeadsKommoPujante.xlsx')
+        
+        # Carregar nova planilha de leads com profissões
+        leads_profissoes_df = pd.read_excel('data/LeadsPujante.xlsx')
         
         # Carregar dados de escritórios apoiadores
         escritorios_df = pd.read_excel('data/escritorios_apoiadores.xlsx')
@@ -60,12 +63,12 @@ def load_data():
         if 'Data de criação' in leads_df.columns:
             leads_df['Data de criação'] = pd.to_datetime(leads_df['Data de criação'], errors='coerce')
         
-        return leads_df, escritorios_df
+        return leads_df, leads_profissoes_df, escritorios_df
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")
-        return None, None
+        return None, None, None
 
-def create_metrics_cards(leads_df, escritorios_df):
+def create_metrics_cards(leads_df, leads_profissoes_df, escritorios_df):
     """Cria cards de métricas principais"""
     col1, col2, col3, col4 = st.columns(4)
     
@@ -79,9 +82,19 @@ def create_metrics_cards(leads_df, escritorios_df):
         </div>
         """, unsafe_allow_html=True)
     
+    # Leads com profissões
+    total_leads_profissoes = len(leads_profissoes_df) if leads_profissoes_df is not None else 0
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Leads com Profissões</div>
+            <div class="metric-value">{total_leads_profissoes:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Escritórios apoiadores
     total_escritorios = len(escritorios_df) if escritorios_df is not None else 0
-    with col2:
+    with col3:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Escritórios Apoiadores</div>
@@ -91,21 +104,11 @@ def create_metrics_cards(leads_df, escritorios_df):
     
     # Receita mensal
     receita_mensal = total_escritorios * 350
-    with col3:
+    with col4:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Receita Mensal</div>
             <div class="metric-value">R$ {receita_mensal:,.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Receita anual
-    receita_anual = receita_mensal * 12
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Receita Anual</div>
-            <div class="metric-value">R$ {receita_anual:,.2f}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -165,6 +168,117 @@ def create_leads_charts(leads_df):
                 st.plotly_chart(fig_tempo, use_container_width=True)
             else:
                 st.info("Dados de data não disponíveis para análise temporal")
+
+def create_profissoes_chart(leads_profissoes_df):
+    """Cria gráfico de distribuição por profissões"""
+    if leads_profissoes_df is None or leads_profissoes_df.empty:
+        st.warning("Dados de profissões não disponíveis")
+        return
+    
+    st.subheader("👨‍💼 Distribuição por Profissões")
+    
+    if 'Profissão' in leads_profissoes_df.columns:
+        # Limpar e normalizar dados de profissões
+        profissoes_clean = leads_profissoes_df['Profissão'].dropna()
+        
+        # Normalizar variações (advogado, Advogado, ADVOGADO, etc.)
+        profissoes_normalized = profissoes_clean.str.strip().str.lower()
+        
+        # Mapear variações comuns
+        mapping = {
+            'advogado': 'Advogado',
+            'advogada': 'Advogado',
+            'estudante': 'Estudante',
+            'estudante de direito': 'Estudante de Direito',
+            'bacharel em direito': 'Bacharel em Direito',
+            'graduada em direito': 'Bacharel em Direito',
+            'servidor publico': 'Servidor Público',
+            'servidor público': 'Servidor Público',
+            'contadora': 'Contador',
+            'contador': 'Contador',
+            'consultor': 'Consultor',
+            'analista jurídico': 'Analista Jurídico',
+            'vendedor': 'Vendedor',
+            'técnico em agropecuária': 'Técnico em Agropecuária',
+            'trabalhador agrícola polivalente': 'Trabalhador Agrícola'
+        }
+        
+        # Aplicar normalização
+        profissoes_final = []
+        for prof in profissoes_normalized:
+            if prof in mapping:
+                profissoes_final.append(mapping[prof])
+            elif prof.strip() != '':
+                # Capitalizar primeira letra se não estiver no mapeamento
+                profissoes_final.append(prof.capitalize())
+        
+        # Contar profissões
+        profissoes_count = pd.Series(profissoes_final).value_counts()
+        
+        # Pegar top 15 profissões
+        top_profissoes = profissoes_count.head(15)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Gráfico de barras
+            fig_bar = px.bar(
+                x=top_profissoes.values,
+                y=top_profissoes.index,
+                orientation='h',
+                title="Top 15 Profissões",
+                color=top_profissoes.values,
+                color_continuous_scale=['#bdc3c7', '#2c3e50']
+            )
+            fig_bar.update_layout(
+                font=dict(size=12),
+                height=500,
+                xaxis_title="Número de Leads",
+                yaxis_title="Profissão",
+                showlegend=False
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with col2:
+            # Gráfico de pizza para top 10
+            top_10 = profissoes_count.head(10)
+            outros = profissoes_count.iloc[10:].sum()
+            
+            if outros > 0:
+                top_10_with_others = top_10.copy()
+                top_10_with_others['Outros'] = outros
+            else:
+                top_10_with_others = top_10
+            
+            fig_pie = px.pie(
+                values=top_10_with_others.values,
+                names=top_10_with_others.index,
+                title="Distribuição das Principais Profissões",
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            fig_pie.update_layout(
+                font=dict(size=12),
+                height=500,
+                showlegend=True
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+        
+        # Estatísticas adicionais
+        st.subheader("📊 Estatísticas de Profissões")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total de Profissões Únicas", len(profissoes_count))
+        
+        with col2:
+            st.metric("Leads com Profissão Informada", len(profissoes_final))
+        
+        with col3:
+            percentage = (len(profissoes_final) / len(leads_profissoes_df)) * 100
+            st.metric("% com Profissão Informada", f"{percentage:.1f}%")
+    
+    else:
+        st.error("Coluna 'Profissão' não encontrada na planilha")
 
 def create_escritorios_charts(escritorios_df):
     """Cria gráficos relacionados aos escritórios apoiadores"""
@@ -278,7 +392,7 @@ def main():
     st.markdown('<h1 class="main-header">📊 Dashboard Pujante</h1>', unsafe_allow_html=True)
     
     # Carregar dados
-    leads_df, escritorios_df = load_data()
+    leads_df, leads_profissoes_df, escritorios_df = load_data()
     
     # Sidebar com filtros
     st.sidebar.title("🔧 Filtros e Configurações")
@@ -306,12 +420,17 @@ def main():
                 leads_df = leads_df[mask]
     
     # Métricas principais
-    create_metrics_cards(leads_df, escritorios_df)
+    create_metrics_cards(leads_df, leads_profissoes_df, escritorios_df)
     
     st.markdown("---")
     
     # Gráficos de leads
     create_leads_charts(leads_df)
+    
+    st.markdown("---")
+    
+    # Gráfico de profissões
+    create_profissoes_chart(leads_profissoes_df)
     
     st.markdown("---")
     
@@ -338,6 +457,18 @@ def main():
             )
         else:
             st.warning("Dados de leads não disponíveis")
+    
+    # Tabela detalhada de profissões (opcional)
+    if st.sidebar.checkbox("Mostrar Tabela Detalhada de Profissões"):
+        st.subheader("👨‍💼 Dados Detalhados das Profissões")
+        if leads_profissoes_df is not None:
+            st.dataframe(
+                leads_profissoes_df.head(50),
+                use_container_width=True,
+                height=400
+            )
+        else:
+            st.warning("Dados de profissões não disponíveis")
 
 if __name__ == "__main__":
     main()
