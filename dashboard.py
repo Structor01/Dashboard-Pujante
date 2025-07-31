@@ -206,11 +206,13 @@ def create_profissoes_chart(leads_profissoes_df):
         # Aplicar normalização
         profissoes_final = []
         for prof in profissoes_normalized:
-            if prof in mapping:
-                profissoes_final.append(mapping[prof])
-            elif prof.strip() != '':
-                # Capitalizar primeira letra se não estiver no mapeamento
-                profissoes_final.append(prof.capitalize())
+            # Verificar se é string e não está vazio
+            if isinstance(prof, str) and prof.strip() != '':
+                if prof in mapping:
+                    profissoes_final.append(mapping[prof])
+                else:
+                    # Capitalizar primeira letra se não estiver no mapeamento
+                    profissoes_final.append(prof.capitalize())
         
         # Contar profissões
         profissoes_count = pd.Series(profissoes_final).value_counts()
